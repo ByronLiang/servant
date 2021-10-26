@@ -16,19 +16,20 @@ type gRpcServer struct {
 }
 
 func NewGRpc(opts ...GRpcOption) *gRpcServer {
-	option := gRpcServerOption{
+	options := gRpcServerOption{
 		Network:   "tcp",
 		Keepalive: time.Duration(10) * time.Second,
 	}
-	gRpcServer := &gRpcServer{}
 	for _, opt := range opts {
-		opt(&option)
+		opt(&options)
 	}
+	gRpcServer := &gRpcServer{options: options}
 	return gRpcServer
 }
 
-func (gRPC *gRpcServer) SetRegisterHandler(registerHandler func(s *grpc.Server)) {
+func (gRPC *gRpcServer) SetRegisterHandler(registerHandler func(s *grpc.Server)) *gRpcServer {
 	gRPC.registerHandler = registerHandler
+	return gRPC
 }
 
 func (gRPC *gRpcServer) Start() error {
@@ -47,6 +48,7 @@ func (gRPC *gRpcServer) Start() error {
 	}
 	server := grpc.NewServer(serverOptions...)
 	gRPC.Server = server
+	gRPC.registerHandler(server)
 	return server.Serve(listener)
 }
 

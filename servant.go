@@ -5,6 +5,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"github.com/ByronLiang/servant/net"
 )
 
 type Servant struct {
@@ -30,35 +33,36 @@ func (s *Servant) Run() []error {
 	ctx, cancel := context.WithCancel(context.Background())
 	srvErrList := make([]error, 0)
 	for _, srv := range s.opt.servers {
-		go func() {
-			err := srv.Start()
+		go func(server net.Server) {
+			err := server.Start()
 			if err != nil {
 				// 服务启动异常
 				srvErrList = append(srvErrList, err)
 				cancel()
 			}
-		}()
+		}(srv)
 	}
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, s.opt.signals...)
-	for {
-		select {
-		case <-ctx.Done():
-			err := s.Stop()
-			if err != nil {
-				srvErrList = append(srvErrList, err)
-			}
-			return srvErrList
-		case <-c:
-			err := s.Stop()
-			if err != nil {
-				srvErrList = append(srvErrList, err)
-			}
-			return srvErrList
+	select {
+	case <-ctx.Done():
+		err := s.Stop()
+		if err != nil {
+			srvErrList = append(srvErrList, err)
+		}
+	case <-c:
+		err := s.Stop()
+		if err != nil {
+			srvErrList = append(srvErrList, err)
 		}
 	}
+	time.Sleep(1 * time.Second)
+	return srvErrList
 }
 
 func (s *Servant) Stop() error {
+	for _, srv := range s.opt.servers {
+		srv.Stop()
+	}
 	return nil
 }
