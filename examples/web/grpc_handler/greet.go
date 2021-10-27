@@ -1,7 +1,7 @@
 package grpc_handler
 
 import (
-	pb "github.com/ByronLiang/servant/examples/web/pb"
+	"github.com/ByronLiang/servant/examples/web/pb"
 	"golang.org/x/net/context"
 )
 

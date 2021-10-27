@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ByronLiang/servant/examples/web/middleware"
-	pb "github.com/ByronLiang/servant/examples/web/pb"
+	"github.com/ByronLiang/servant/examples/web/pb"
 
 	"github.com/ByronLiang/servant"
 	"github.com/ByronLiang/servant/examples/web/http_handler"
@@ -18,9 +18,14 @@ import (
 )
 
 func main() {
-	httpSrv := net.NewDefaultHttpServer(net.HttpAddress(":8090")).
-		InitHandle(InitHttpSrv())
+	routeGroup := InitHttpRouteGroup()
+	httpSrv := net.NewDefaultHttpServer(
+		net.HttpAddress(":8090"),
+		net.HttpRouteGroup(routeGroup),
+	).InitRouteHandle()
+
 	gRPCSrv := net.NewGRpc(net.GRpcAddress(":9000")).SetRegisterHandler(InitRegisterHandler)
+
 	serve := servant.NewServant(
 		servant.Name("web"),
 		servant.AddServer(gRPCSrv),
@@ -40,6 +45,34 @@ func InitHttpSrv() http.Handler {
 	public.Use(middleware.TraceInfoMiddleware)
 	public.Handle(http.MethodGet, "/login", http_handler.LoginUser)
 	return r
+}
+
+func InitHttpRouteGroup() []net.ApiGroupPath {
+	privatePaths := []net.ApiPath{
+		{
+			Method:  http.MethodGet,
+			Path:    "/query",
+			Handler: http_handler.QueryUser,
+		},
+	}
+	privateRouteGroup := net.ApiGroupPath{
+		Prefix:       "/api/user",
+		Interceptors: []gin.HandlerFunc{middleware.AuthenticateMiddleware, middleware.HttpSignatureValidateInterceptor},
+		Paths:        privatePaths,
+	}
+	publicPaths := []net.ApiPath{
+		{
+			Method:  http.MethodGet,
+			Path:    "/login",
+			Handler: http_handler.LoginUser,
+		},
+	}
+	publicRouteGroup := net.ApiGroupPath{
+		Prefix:       "/api/user",
+		Interceptors: []gin.HandlerFunc{middleware.TraceInfoMiddleware},
+		Paths:        publicPaths,
+	}
+	return []net.ApiGroupPath{privateRouteGroup, publicRouteGroup}
 }
 
 func InitRegisterHandler(s *grpc.Server) {

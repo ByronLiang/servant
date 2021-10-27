@@ -39,18 +39,15 @@ func NewHttpServer(h *http.Server, opts ...HttpOption) *httpServer {
 func (s *httpServer) InitRouteHandle() *httpServer {
 	router := gin.Default()
 	router.MaxMultipartMemory = 20 << 20
-	for _, item := range s.options.Routes {
-		if item.IsNeedIdentityValidate {
-			handler := make([]gin.HandlerFunc, len(s.options.IdentityValidateInterceptor)+1)
-			copy(handler, s.options.IdentityValidateInterceptor)
-			handler[len(s.options.IdentityValidateInterceptor)] = item.Handler
-			router.Handle(item.Method, item.Path, handler...)
-		} else {
-			handler := make([]gin.HandlerFunc, len(s.options.Interceptors)+1)
-			copy(handler, s.options.Interceptors)
-			handler[len(s.options.Interceptors)] = item.Handler
-			router.Handle(item.Method, item.Path, handler...)
+	for _, group := range s.options.RouteGroup {
+		rg := router.Group(group.Prefix)
+		rg.Use(group.Interceptors...)
+		for _, item := range group.Paths {
+			rg.Handle(item.Method, item.Path, item.Handler)
 		}
+	}
+	for _, item := range s.options.Routes {
+		router.Handle(item.Method, item.Path, item.Handler)
 	}
 	s.Handler = router
 	return s
