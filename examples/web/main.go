@@ -4,31 +4,37 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/ByronLiang/servant/examples/web/rpc"
+
 	"github.com/ByronLiang/servant/examples/web/grpc_handler"
-
-	"google.golang.org/grpc"
-
-	"github.com/ByronLiang/servant/examples/web/middleware"
-	"github.com/ByronLiang/servant/examples/web/pb"
 
 	"github.com/ByronLiang/servant"
 	"github.com/ByronLiang/servant/examples/web/http_handler"
+	"github.com/ByronLiang/servant/examples/web/middleware"
 	"github.com/ByronLiang/servant/net"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	// gRPC 客户端
+	InitRpcCli()
+
 	routeGroup := InitHttpRouteGroup()
 	httpSrv := net.NewDefaultHttpServer(
 		net.HttpAddress(":8090"),
 		net.HttpRouteGroup(routeGroup),
 	).InitRouteHandle()
 
-	gRPCSrv := net.NewGRpc(net.GRpcAddress(":9000")).SetRegisterHandler(InitRegisterHandler)
+	greetSrv := net.NewGRpc(net.GRpcAddress(":9000")).
+		SetRegisterHandler(grpc_handler.RegisterGreetService)
+
+	userSrv := net.NewGRpc(net.GRpcAddress(":9001")).
+		SetRegisterHandler(grpc_handler.RegisterUserService)
 
 	serve := servant.NewServant(
 		servant.Name("web"),
-		servant.AddServer(gRPCSrv),
+		servant.AddServer(greetSrv),
+		servant.AddServer(userSrv),
 		servant.AddServer(httpSrv))
 	errs := serve.Run()
 	for _, err := range errs {
@@ -75,6 +81,13 @@ func InitHttpRouteGroup() []net.ApiGroupPath {
 	return []net.ApiGroupPath{privateRouteGroup, publicRouteGroup}
 }
 
-func InitRegisterHandler(s *grpc.Server) {
-	pb.RegisterGreeterServer(s, &grpc_handler.GreetService{})
+func InitRpcCli() {
+	err := rpc.InitUserRpc(":9001")
+	if err != nil {
+		log.Println("init rpc error", err.Error())
+	}
+	err = rpc.InitGreeterRpc(":9000")
+	if err != nil {
+		log.Println("init rpc error", err.Error())
+	}
 }
