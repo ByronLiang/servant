@@ -7,10 +7,12 @@ import (
 )
 
 type gRpcServerOption struct {
+	Kind         string
 	Address      string
 	Keepalive    time.Duration
 	Network      string
 	Interceptors []grpc.UnaryServerInterceptor
+	IsReflection bool
 }
 
 type GRpcOption func(option *gRpcServerOption)
@@ -36,5 +38,12 @@ func GRpcKeepalive(timeout time.Duration) GRpcOption {
 func GRpcNetwork(network string) GRpcOption {
 	return func(option *gRpcServerOption) {
 		option.Network = network
+	}
+}
+
+// 配置是否将方法做反射
+func GRpcReflection(isReflection bool) GRpcOption {
+	return func(option *gRpcServerOption) {
+		option.IsReflection = isReflection
 	}
 }

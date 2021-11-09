@@ -15,6 +15,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	GreetSrv = ":9000"
+	UserSrv  = ":9001"
+)
+
 func main() {
 	// gRPC 客户端
 	InitRpcCli()
@@ -25,10 +30,10 @@ func main() {
 		net.HttpRouteGroup(routeGroup),
 	).InitRouteHandle()
 
-	greetSrv := net.NewGRpc(net.GRpcAddress(":9000")).
+	greetSrv := net.NewGRpc(net.GRpcAddress(GreetSrv)).
 		SetRegisterHandler(grpc_handler.RegisterGreetService)
 
-	userSrv := net.NewGRpc(net.GRpcAddress(":9001")).
+	userSrv := net.NewGRpc(net.GRpcAddress(UserSrv)).
 		SetRegisterHandler(grpc_handler.RegisterUserService)
 
 	serve := servant.NewServant(
@@ -82,11 +87,11 @@ func InitHttpRouteGroup() []net.ApiGroupPath {
 }
 
 func InitRpcCli() {
-	err := rpc.InitUserRpc(":9001")
+	err := rpc.InitUserRpc(UserSrv)
 	if err != nil {
 		log.Println("init rpc error", err.Error())
 	}
-	err = rpc.InitGreeterRpc(":9000")
+	err = rpc.InitGreeterRpc(GreetSrv)
 	if err != nil {
 		log.Println("init rpc error", err.Error())
 	}

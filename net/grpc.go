@@ -4,6 +4,8 @@ import (
 	"net"
 	"time"
 
+	"google.golang.org/grpc/reflection"
+
 	"google.golang.org/grpc/keepalive"
 
 	"google.golang.org/grpc"
@@ -17,6 +19,7 @@ type gRpcServer struct {
 
 func NewGRpc(opts ...GRpcOption) *gRpcServer {
 	options := gRpcServerOption{
+		Kind:      GRPCKind,
 		Network:   "tcp",
 		Keepalive: time.Duration(10) * time.Second,
 	}
@@ -47,6 +50,9 @@ func (gRPC *gRpcServer) Start() error {
 		serverOptions = append(serverOptions, grpc.ChainUnaryInterceptor(gRPC.options.Interceptors...))
 	}
 	server := grpc.NewServer(serverOptions...)
+	if gRPC.options.IsReflection {
+		reflection.Register(server)
+	}
 	gRPC.Server = server
 	gRPC.registerHandler(server)
 	return server.Serve(listener)
@@ -55,4 +61,8 @@ func (gRPC *gRpcServer) Start() error {
 func (gRPC *gRpcServer) Stop() error {
 	gRPC.Server.GracefulStop()
 	return nil
+}
+
+func (gRPC *gRpcServer) Kind() string {
+	return gRPC.options.Kind
 }

@@ -16,12 +16,14 @@ type httpServer struct {
 
 func NewDefaultHttpServer(opts ...HttpOption) *httpServer {
 	defaultServer := &http.Server{
-		IdleTimeout:    1 * time.Minute,
+		IdleTimeout:    30 * time.Second,
 		ReadTimeout:    30 * time.Second,
 		WriteTimeout:   30 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
-	options := httpOptions{}
+	options := httpOptions{
+		Kind: HttpKind,
+	}
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -29,7 +31,9 @@ func NewDefaultHttpServer(opts ...HttpOption) *httpServer {
 }
 
 func NewHttpServer(h *http.Server, opts ...HttpOption) *httpServer {
-	options := httpOptions{}
+	options := httpOptions{
+		Kind: HttpKind,
+	}
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -72,4 +76,8 @@ func (s *httpServer) Start() error {
 func (s *httpServer) Stop() error {
 	// 关闭Http 服务
 	return s.Server.Shutdown(context.Background())
+}
+
+func (s *httpServer) Kind() string {
+	return s.options.Kind
 }

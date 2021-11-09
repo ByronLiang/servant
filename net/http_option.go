@@ -3,6 +3,7 @@ package net
 import "github.com/gin-gonic/gin"
 
 type httpOptions struct {
+	Kind       string
 	Address    string
 	Routes     []ApiPath
 	RouteGroup []ApiGroupPath
