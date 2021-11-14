@@ -37,7 +37,11 @@ func (s *Servant) Run() []error {
 			err := server.Start()
 			if err != nil {
 				// 服务启动异常
-				srvErrList = append(srvErrList, err)
+				netErr := &netError{
+					cause: err,
+					kind:  server.Kind(),
+				}
+				srvErrList = append(srvErrList, netErr)
 				cancel()
 			}
 		}(srv)
@@ -46,10 +50,7 @@ func (s *Servant) Run() []error {
 	signal.Notify(c, s.opt.signals...)
 	select {
 	case <-ctx.Done():
-		err := s.Stop()
-		if err != nil {
-			srvErrList = append(srvErrList, err)
-		}
+		// 服务启动异常, 无需调用Stop方法, 有可能引发空指针
 	case <-c:
 		err := s.Stop()
 		if err != nil {

@@ -16,6 +16,7 @@ import (
 )
 
 const (
+	HttpSrv  = ":8090"
 	GreetSrv = ":9000"
 	UserSrv  = ":9001"
 )
@@ -26,7 +27,7 @@ func main() {
 
 	routeGroup := InitHttpRouteGroup()
 	httpSrv := net.NewDefaultHttpServer(
-		net.HttpAddress(":8090"),
+		net.HttpAddress(HttpSrv),
 		net.HttpRouteGroup(routeGroup),
 	).InitRouteHandle()
 
