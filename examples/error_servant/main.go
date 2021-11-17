@@ -27,9 +27,6 @@ func main() {
 		servant.AddServer(userSrv))
 	errs := serve.Run()
 	for _, err := range errs {
-		//if servant.IsNetError(err) {
-		//	log.Println("catch net error")
-		//}
 		log.Println(err)
 	}
 }

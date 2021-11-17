@@ -4,6 +4,9 @@ import (
 	"net"
 	"time"
 
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+
 	"google.golang.org/grpc/reflection"
 
 	"google.golang.org/grpc/keepalive"
@@ -13,8 +16,9 @@ import (
 
 type gRpcServer struct {
 	*grpc.Server
-	options         gRpcServerOption
-	registerHandler func(s *grpc.Server)
+	options            gRpcServerOption
+	registerHandler    func(s *grpc.Server)
+	healthCheckHandler func(s *grpc.Server)
 }
 
 func NewGRpc(opts ...GRpcOption) *gRpcServer {
@@ -35,6 +39,21 @@ func (gRPC *gRpcServer) SetRegisterHandler(registerHandler func(s *grpc.Server))
 	return gRPC
 }
 
+// 自定义注入健康检测
+func (gRPC *gRpcServer) SetHealthCheckHandler(healthCheckHandler func(s *grpc.Server)) *gRpcServer {
+	gRPC.healthCheckHandler = healthCheckHandler
+	return gRPC
+}
+
+// 默认配置健康检测
+func (gRPC *gRpcServer) SetDefaultHealthCheckHandler() *gRpcServer {
+	gRPC.healthCheckHandler = func(s *grpc.Server) {
+		h := health.NewServer()
+		healthpb.RegisterHealthServer(s, h)
+	}
+	return gRPC
+}
+
 func (gRPC *gRpcServer) Start() error {
 	listener, err := net.Listen(gRPC.options.Network, gRPC.options.Address)
 	if err != nil {
@@ -52,6 +71,10 @@ func (gRPC *gRpcServer) Start() error {
 	server := grpc.NewServer(serverOptions...)
 	if gRPC.options.IsReflection {
 		reflection.Register(server)
+	}
+	// gRPC 健康检测
+	if gRPC.options.IsHealthCheck {
+		gRPC.healthCheckHandler(server)
 	}
 	gRPC.Server = server
 	gRPC.registerHandler(server)
