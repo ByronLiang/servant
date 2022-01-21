@@ -3,10 +3,11 @@ package net
 import "github.com/gin-gonic/gin"
 
 type httpOptions struct {
-	Kind       string
-	Address    string
-	Routes     []ApiPath
-	RouteGroup []ApiGroupPath
+	Kind         string
+	Address      string
+	IsRegistered bool
+	Routes       []ApiPath
+	RouteGroup   []ApiGroupPath
 }
 
 type HttpOption func(options *httpOptions)
@@ -41,5 +42,12 @@ func HttpRoutes(routes []ApiPath) HttpOption {
 func HttpRouteGroup(group []ApiGroupPath) HttpOption {
 	return func(options *httpOptions) {
 		options.RouteGroup = group
+	}
+}
+
+// 是否进行服务注册
+func HttpIsRegistered(isRegistered bool) HttpOption {
+	return func(options *httpOptions) {
+		options.IsRegistered = isRegistered
 	}
 }

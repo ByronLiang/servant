@@ -6,14 +6,16 @@ import (
 )
 
 type pprofServer struct {
-	Address string
-	kind    string
+	Address      string
+	kind         string
+	isRegistered bool
 }
 
 func NewPProfServer(address string) *pprofServer {
 	return &pprofServer{
-		Address: address,
-		kind:    PProfKind,
+		Address:      address,
+		kind:         PProfKind,
+		isRegistered: false,
 	}
 }
 
@@ -43,6 +45,10 @@ func (p *pprofServer) Stop() error {
 
 func (p *pprofServer) Kind() string {
 	return p.kind
+}
+
+func (p *pprofServer) IsRegistered() bool {
+	return p.isRegistered
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {

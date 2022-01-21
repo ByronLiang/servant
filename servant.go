@@ -44,8 +44,12 @@ func (s *Servant) Run() []error {
 				srvErrList = append(srvErrList, netErr)
 				cancel()
 			}
+
 		}(srv)
 	}
+	// sleep to wait server start
+	time.Sleep(1 * time.Second)
+	// server register
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, s.opt.signals...)
 	select {

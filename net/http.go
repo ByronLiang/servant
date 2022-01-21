@@ -2,16 +2,26 @@ package net
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
+	"net"
 	"net/http"
+	"net/url"
+	"sync"
 	"time"
+
+	"github.com/ByronLiang/servant/util"
 
 	"github.com/gin-gonic/gin"
 )
 
 type httpServer struct {
 	*http.Server
-	options httpOptions
+	lis      net.Listener
+	tlsConf  *tls.Config
+	once     sync.Once
+	endpoint *url.URL
+	options  httpOptions
 }
 
 func NewDefaultHttpServer(opts ...HttpOption) *httpServer {
@@ -22,7 +32,8 @@ func NewDefaultHttpServer(opts ...HttpOption) *httpServer {
 		MaxHeaderBytes: 1 << 20,
 	}
 	options := httpOptions{
-		Kind: HttpKind,
+		Kind:         HttpKind,
+		IsRegistered: false,
 	}
 	for _, opt := range opts {
 		opt(&options)
@@ -62,9 +73,36 @@ func (s *httpServer) InitHandle(handler http.Handler) *httpServer {
 	return s
 }
 
+func (s *httpServer) Endpoint() (*url.URL, error) {
+	var err error
+	s.once.Do(func() {
+		lis, errListen := net.Listen("tcp", s.options.Address)
+		if errListen != nil {
+			err = errListen
+			return
+		}
+		// build url from host and port
+		addr, errExtract := util.Extract(s.options.Address, lis)
+		if errExtract != nil {
+			lis.Close()
+			err = errExtract
+			return
+		}
+		s.lis = lis
+		s.endpoint = util.BuildEndpoint("http", addr, s.tlsConf != nil)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.endpoint, nil
+}
+
 func (s *httpServer) Start() error {
-	s.Addr = s.options.Address
-	err := s.Server.ListenAndServe()
+	_, err := s.Endpoint()
+	if err != nil {
+		return err
+	}
+	err = s.Server.Serve(s.lis)
 	if err != nil {
 		if errors.Is(err, http.ErrServerClosed) {
 			return nil
@@ -80,4 +118,8 @@ func (s *httpServer) Stop() error {
 
 func (s *httpServer) Kind() string {
 	return s.options.Kind
+}
+
+func (s *httpServer) IsRegistered() bool {
+	return s.options.IsRegistered
 }

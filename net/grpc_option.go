@@ -14,6 +14,7 @@ type gRpcServerOption struct {
 	Interceptors  []grpc.UnaryServerInterceptor
 	IsReflection  bool
 	IsHealthCheck bool
+	IsRegistered  bool
 }
 
 type GRpcOption func(option *gRpcServerOption)
@@ -52,5 +53,12 @@ func GRpcReflection(isReflection bool) GRpcOption {
 func GRpcHealthCheck(isHealthCheck bool) GRpcOption {
 	return func(option *gRpcServerOption) {
 		option.IsHealthCheck = isHealthCheck
+	}
+}
+
+// 是否进行服务注册
+func GRpcIsRegistered(isRegistered bool) GRpcOption {
+	return func(options *gRpcServerOption) {
+		options.IsRegistered = isRegistered
 	}
 }
