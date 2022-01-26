@@ -12,43 +12,67 @@ import (
 type leaderFollowerRegistry struct {
 	ctx      context.Context
 	cancel   context.CancelFunc
-	client   *clientv3.Client
 	session  *concurrency.Session
 	election *concurrency.Election
-	opts     *LeaderFollowerOptions
+	opts     *leaderFollowerOptions
 }
 
-type LeaderFollowerOptions struct {
-	HeartBeatTTL int
-	Prefix       string
-	Value        string
+type LeaderFollowerOption func(o *leaderFollowerOptions)
+
+type leaderFollowerOptions struct {
+	heartBeatTTL int
+	prefix       string
+	value        string
 }
 
-func NewLeaderFollowerRegistry(client *clientv3.Client, opts *LeaderFollowerOptions) (*leaderFollowerRegistry, error) {
+func HeartBeatTTL(ttl int) LeaderFollowerOption {
+	return func(o *leaderFollowerOptions) {
+		o.heartBeatTTL = ttl
+	}
+}
+
+func Prefix(prefix string) LeaderFollowerOption {
+	return func(o *leaderFollowerOptions) {
+		o.prefix = prefix
+	}
+}
+
+func Value(value string) LeaderFollowerOption {
+	return func(o *leaderFollowerOptions) {
+		o.value = value
+	}
+}
+
+func NewLeaderFollowerRegistry(client *clientv3.Client, options ...LeaderFollowerOption) (*leaderFollowerRegistry, error) {
 	ctx, cancel := context.WithCancel(context.Background())
+	opts := &leaderFollowerOptions{
+		heartBeatTTL: 5,
+	}
+	for _, option := range options {
+		option(opts)
+	}
+	// 若正常退出, 触发resign  而 ttl 针对非resign 下故障容忍时长触发重新选举
+	session, err := concurrency.NewSession(client, concurrency.WithTTL(opts.heartBeatTTL))
+	if err != nil {
+		return nil, err
+	}
 	return &leaderFollowerRegistry{
-		ctx:    ctx,
-		client: client,
-		cancel: cancel,
-		opts:   opts,
+		ctx:     ctx,
+		session: session,
+		cancel:  cancel,
+		opts:    opts,
 	}, nil
 }
 
 func (r *leaderFollowerRegistry) Register(ctx context.Context, service *registry.ServiceInstance) error {
-	key := fmt.Sprintf("%s/%s", r.opts.Value, service.Name)
-	r.opts.Prefix = key
+	key := fmt.Sprintf("%s/%s", r.opts.value, service.Name)
+	r.opts.prefix = key
 	marshalStr, err := marshal(service)
 	if err != nil {
 		return err
 	}
-	r.opts.Value = marshalStr
-	// 若正常退出, 触发resign  而 ttl 针对非resign 下故障容忍时长触发重新选举
-	session, err := concurrency.NewSession(r.client, concurrency.WithTTL(r.opts.HeartBeatTTL))
-	if err != nil {
-		return err
-	}
-	election := concurrency.NewElection(session, r.opts.Prefix)
-	r.session = session
+	r.opts.value = marshalStr
+	election := concurrency.NewElection(r.session, r.opts.prefix)
 	r.election = election
 	campaignRes := r.campaign()
 	err = <-campaignRes
@@ -63,12 +87,8 @@ func (r *leaderFollowerRegistry) Deregister(ctx context.Context, service *regist
 		if err != nil {
 			return err
 		}
-		currentInstance, err := unmarshal([]byte(r.opts.Value))
-		if err != nil {
-			return err
-		}
 		// compare register endpoint
-		if leaderInstance.Endpoints[0] == currentInstance.Endpoints[0] {
+		if leaderInstance.Endpoints[0] == service.Endpoints[0] {
 			// 优雅停机: 从备份节点重新选举出 leader
 			err = r.election.Resign(ctx)
 			if err != nil {
@@ -85,20 +105,20 @@ func (r *leaderFollowerRegistry) Deregister(ctx context.Context, service *regist
 func (r *leaderFollowerRegistry) campaign() chan error {
 	campaignRes := make(chan error)
 	go func() {
-		err := r.election.Campaign(r.ctx, r.opts.Value)
+		err := r.election.Campaign(r.ctx, r.opts.value)
 		campaignRes <- err
 	}()
 	return campaignRes
 }
 
 func (r *leaderFollowerRegistry) Watch(ctx context.Context, name string) (registry.Watcher, error) {
-	key := fmt.Sprintf("%s/%s", r.opts.Prefix, name)
-	return newLeaderFollowerWatcher(ctx, key, r.client)
+	key := fmt.Sprintf("%s/%s", r.opts.prefix, name)
+	return newLeaderFollowerWatcher(ctx, key, r.session)
 }
 
 func (r *leaderFollowerRegistry) GetService(ctx context.Context, name string) ([]*registry.ServiceInstance, error) {
-	prefix := fmt.Sprintf("%s/%s/", r.opts.Prefix, name)
-	resp, err := r.client.Get(ctx, prefix, clientv3.WithFirstCreate()...)
+	prefix := fmt.Sprintf("%s/%s/", r.opts.prefix, name)
+	resp, err := r.session.Client().Get(ctx, prefix, clientv3.WithFirstCreate()...)
 	if err != nil {
 		return nil, err
 	} else if len(resp.Kvs) == 0 {

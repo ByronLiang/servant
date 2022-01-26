@@ -60,7 +60,7 @@ func (l leaderFollowerWatcher) Stop() error {
 	return l.session.Close()
 }
 
-func newLeaderFollowerWatcher(cctx context.Context, key string, c *clientv3.Client) (*leaderFollowerWatcher, error) {
+func newLeaderFollowerWatcher(cctx context.Context, key string, session *concurrency.Session) (*leaderFollowerWatcher, error) {
 	ctx, cancel := context.WithCancel(cctx)
 	w := &leaderFollowerWatcher{
 		ctx:    ctx,
@@ -68,16 +68,12 @@ func newLeaderFollowerWatcher(cctx context.Context, key string, c *clientv3.Clie
 		key:    key,
 	}
 	prefix := w.key + "/"
-	resp, err := c.Get(ctx, prefix, clientv3.WithFirstCreate()...)
+	resp, err := session.Client().Get(ctx, prefix, clientv3.WithFirstCreate()...)
 	if err != nil {
 		return nil, err
 	} else if len(resp.Kvs) == 0 {
 		// no leader currently elected
 		return nil, concurrency.ErrElectionNoLeader
-	}
-	session, err := concurrency.NewSession(c)
-	if err != nil {
-		return nil, err
 	}
 	w.session = session
 	w.election = concurrency.ResumeElection(w.session, prefix,
