@@ -3,13 +3,17 @@ package servant
 import (
 	"os"
 
+	"github.com/ByronLiang/servant/registry"
+
 	"github.com/ByronLiang/servant/net"
 )
 
 type option struct {
-	name    string
-	signals []os.Signal
-	servers []net.Server
+	name              string
+	signals           []os.Signal
+	servers           []net.Server
+	registrar         registry.Registrar
+	registrarInstance *registry.ServiceInstance
 	// TODO 协程任务运行监听
 }
 
@@ -29,5 +33,11 @@ func Signal(signals ...os.Signal) Option {
 func AddServer(srv net.Server) Option {
 	return func(o *option) {
 		o.servers = append(o.servers, srv)
+	}
+}
+
+func Registrar(registrar registry.Registrar) Option {
+	return func(o *option) {
+		o.registrar = registrar
 	}
 }
