@@ -1,7 +1,10 @@
 package rpc
 
 import (
-	"github.com/ByronLiang/servant/examples/web/pb"
+	"context"
+
+	"github.com/ByronLiang/servant/examples/public/pb"
+	"github.com/ByronLiang/servant/net"
 	"google.golang.org/grpc"
 )
 
@@ -13,7 +16,7 @@ type user struct {
 }
 
 func InitUserRpc(address string) error {
-	con, err := NewClientConnection(address)
+	con, err := net.DialInsecure(context.Background(), net.WithEndpoint(address))
 	if err != nil {
 		return err
 	}
@@ -32,7 +35,7 @@ type greeter struct {
 }
 
 func InitGreeterRpc(address string) error {
-	con, err := NewClientConnection(address)
+	con, err := net.DialInsecure(context.Background(), net.WithEndpoint(address))
 	if err != nil {
 		return err
 	}
@@ -41,13 +44,4 @@ func InitGreeterRpc(address string) error {
 		connection: con,
 	}
 	return nil
-}
-
-// 公共方法
-func NewClientConnection(address string) (*grpc.ClientConn, error) {
-	connection, err := grpc.Dial(address, grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
-	return connection, nil
 }

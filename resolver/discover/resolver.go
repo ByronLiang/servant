@@ -2,7 +2,6 @@ package discover
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/ByronLiang/servant/util"
@@ -62,13 +61,7 @@ func (r *discoveryResolver) update(ins []*registry.ServiceInstance) {
 		addr.Attributes = addr.Attributes.WithValues("rawServiceInstance", in)
 		addrs = append(addrs, addr)
 	}
-	if len(addrs) == 0 {
-		return
-	}
-	err := r.cc.UpdateState(resolver.State{Addresses: addrs})
-	if err != nil {
-		log.Println("update state error", err.Error())
-	}
+	r.cc.UpdateState(resolver.State{Addresses: addrs})
 }
 
 func (r *discoveryResolver) Close() {

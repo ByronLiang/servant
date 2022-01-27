@@ -78,7 +78,6 @@ func (b *builder) Build(target resolver.Target, cc resolver.ClientConn, opts res
 	return r, nil
 }
 
-// Scheme return scheme of discovery
 func (*builder) Scheme() string {
 	return name
 }
