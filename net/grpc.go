@@ -71,7 +71,13 @@ func (gRPC *gRpcServer) Endpoint() (*url.URL, error) {
 			err = errListen
 			return
 		}
-		addr, errHostExtract := util.Extract(gRPC.options.Address, lis)
+		var endpointAddr string
+		if gRPC.options.RegisterAddress != "" {
+			endpointAddr = gRPC.options.RegisterAddress
+		} else {
+			endpointAddr = gRPC.options.Address
+		}
+		addr, errHostExtract := util.Extract(endpointAddr, lis)
 		if errHostExtract != nil {
 			_ = lis.Close()
 			err = errHostExtract

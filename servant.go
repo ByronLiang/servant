@@ -2,10 +2,13 @@ package servant
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/ByronLiang/servant/registry/etcd"
 
 	"github.com/ByronLiang/servant/registry"
 
@@ -51,16 +54,46 @@ func (s *Servant) Run() []error {
 	}
 	// sleep to wait server start
 	time.Sleep(1 * time.Second)
-	instance := s.buildServiceInstance()
-	if instance != nil {
-		err := s.opt.registrar.Register(context.Background(), instance)
-		if err == nil {
-			s.opt.registrarInstance = instance
-		}
-	}
 	// server register
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, s.opt.signals...)
+	if s.opt.registrar != nil {
+		instance := s.buildServiceInstance()
+		if instance == nil {
+			srvErrList = append(srvErrList, errors.New("build service instance error"))
+			return srvErrList
+		}
+		err := s.opt.registrar.Register(context.Background(), instance)
+		if err != nil {
+			srvErrList = append(srvErrList, err)
+			return srvErrList
+		}
+		s.opt.registrarInstance = instance
+		if leaderFollowerRegister, ok := s.opt.registrar.(*etcd.LeaderFollowerRegistry); ok {
+			select {
+			case campaignRes := <-leaderFollowerRegister.CampaignRes:
+				if campaignRes != nil {
+					srvErrList = append(srvErrList, campaignRes)
+					err = s.opt.registrar.Deregister(context.Background(), instance)
+					if err != nil {
+						srvErrList = append(srvErrList, err)
+					}
+					err := s.Stop()
+					if err != nil {
+						srvErrList = append(srvErrList, err)
+					}
+					return srvErrList
+				}
+				// campaign leader success handle
+			case <-c:
+				err := s.Stop()
+				if err != nil {
+					srvErrList = append(srvErrList, err)
+				}
+				return srvErrList
+			}
+		}
+	}
 	select {
 	case <-ctx.Done():
 		// 服务启动异常, 无需调用Stop方法, 有可能引发空指针

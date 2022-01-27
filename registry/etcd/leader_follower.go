@@ -9,20 +9,21 @@ import (
 	"go.etcd.io/etcd/client/v3/concurrency"
 )
 
-type leaderFollowerRegistry struct {
-	ctx      context.Context
-	cancel   context.CancelFunc
-	session  *concurrency.Session
-	election *concurrency.Election
-	opts     *leaderFollowerOptions
+type LeaderFollowerRegistry struct {
+	ctx         context.Context
+	cancel      context.CancelFunc
+	session     *concurrency.Session
+	election    *concurrency.Election
+	opts        *leaderFollowerOptions
+	CampaignRes chan error
 }
 
 type LeaderFollowerOption func(o *leaderFollowerOptions)
 
 type leaderFollowerOptions struct {
 	heartBeatTTL int
+	namespace    string
 	prefix       string
-	value        string
 }
 
 func HeartBeatTTL(ttl int) LeaderFollowerOption {
@@ -31,19 +32,13 @@ func HeartBeatTTL(ttl int) LeaderFollowerOption {
 	}
 }
 
-func Prefix(prefix string) LeaderFollowerOption {
+func NameSpace(namespace string) LeaderFollowerOption {
 	return func(o *leaderFollowerOptions) {
-		o.prefix = prefix
+		o.namespace = namespace
 	}
 }
 
-func Value(value string) LeaderFollowerOption {
-	return func(o *leaderFollowerOptions) {
-		o.value = value
-	}
-}
-
-func NewLeaderFollowerRegistry(client *clientv3.Client, options ...LeaderFollowerOption) (*leaderFollowerRegistry, error) {
+func NewLeaderFollowerRegistry(client *clientv3.Client, options ...LeaderFollowerOption) (*LeaderFollowerRegistry, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	opts := &leaderFollowerOptions{
 		heartBeatTTL: 5,
@@ -56,7 +51,7 @@ func NewLeaderFollowerRegistry(client *clientv3.Client, options ...LeaderFollowe
 	if err != nil {
 		return nil, err
 	}
-	return &leaderFollowerRegistry{
+	return &LeaderFollowerRegistry{
 		ctx:     ctx,
 		session: session,
 		cancel:  cancel,
@@ -64,59 +59,39 @@ func NewLeaderFollowerRegistry(client *clientv3.Client, options ...LeaderFollowe
 	}, nil
 }
 
-func (r *leaderFollowerRegistry) Register(ctx context.Context, service *registry.ServiceInstance) error {
-	key := fmt.Sprintf("%s/%s", r.opts.value, service.Name)
-	r.opts.prefix = key
+func (r *LeaderFollowerRegistry) Register(ctx context.Context, service *registry.ServiceInstance) error {
+	r.opts.prefix = fmt.Sprintf("%s/%s", r.opts.namespace, service.Name)
 	marshalStr, err := marshal(service)
 	if err != nil {
 		return err
 	}
-	r.opts.value = marshalStr
 	election := concurrency.NewElection(r.session, r.opts.prefix)
 	r.election = election
-	campaignRes := r.campaign()
-	err = <-campaignRes
-	return err
+	r.campaign(marshalStr)
+	return nil
 }
 
-func (r *leaderFollowerRegistry) Deregister(ctx context.Context, service *registry.ServiceInstance) error {
-	// 查看当前leader
-	res, err := r.election.Leader(ctx)
-	if err == nil {
-		leaderInstance, err := unmarshal(res.Kvs[0].Value)
-		if err != nil {
-			return err
-		}
-		// compare register endpoint
-		if leaderInstance.Endpoints[0] == service.Endpoints[0] {
-			// 优雅停机: 从备份节点重新选举出 leader
-			err = r.election.Resign(ctx)
-			if err != nil {
-				return err
-			}
-		} else {
-			// 解除参与选举leader
-			r.cancel()
-		}
-	}
+func (r *LeaderFollowerRegistry) Deregister(ctx context.Context, service *registry.ServiceInstance) error {
+	r.election.Resign(ctx)
+	r.cancel()
 	return r.session.Close()
 }
 
-func (r *leaderFollowerRegistry) campaign() chan error {
-	campaignRes := make(chan error)
+func (r *LeaderFollowerRegistry) campaign(value string) {
+	r.CampaignRes = make(chan error)
 	go func() {
-		err := r.election.Campaign(r.ctx, r.opts.value)
-		campaignRes <- err
+		err := r.election.Campaign(r.ctx, value)
+		r.CampaignRes <- err
+		close(r.CampaignRes)
 	}()
-	return campaignRes
 }
 
-func (r *leaderFollowerRegistry) Watch(ctx context.Context, name string) (registry.Watcher, error) {
-	key := fmt.Sprintf("%s/%s", r.opts.prefix, name)
-	return newLeaderFollowerWatcher(ctx, key, r.session)
+func (r *LeaderFollowerRegistry) Watch(ctx context.Context, name string) (registry.Watcher, error) {
+	r.opts.prefix = fmt.Sprintf("%s/%s", r.opts.namespace, name)
+	return newLeaderFollowerWatcher(ctx, r.opts.prefix, r.session)
 }
 
-func (r *leaderFollowerRegistry) GetService(ctx context.Context, name string) ([]*registry.ServiceInstance, error) {
+func (r *LeaderFollowerRegistry) GetService(ctx context.Context, name string) ([]*registry.ServiceInstance, error) {
 	prefix := fmt.Sprintf("%s/%s/", r.opts.prefix, name)
 	resp, err := r.session.Client().Get(ctx, prefix, clientv3.WithFirstCreate()...)
 	if err != nil {

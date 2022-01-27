@@ -7,14 +7,15 @@ import (
 )
 
 type gRpcServerOption struct {
-	Kind          string
-	Address       string
-	Keepalive     time.Duration
-	Network       string
-	Interceptors  []grpc.UnaryServerInterceptor
-	IsReflection  bool
-	IsHealthCheck bool
-	IsRegistered  bool
+	Kind            string
+	Address         string
+	RegisterAddress string
+	Keepalive       time.Duration
+	Network         string
+	Interceptors    []grpc.UnaryServerInterceptor
+	IsReflection    bool
+	IsHealthCheck   bool
+	IsRegistered    bool
 }
 
 type GRpcOption func(option *gRpcServerOption)
@@ -22,6 +23,12 @@ type GRpcOption func(option *gRpcServerOption)
 func GRpcAddress(address string) GRpcOption {
 	return func(option *gRpcServerOption) {
 		option.Address = address
+	}
+}
+
+func RegisterAddress(address string) GRpcOption {
+	return func(option *gRpcServerOption) {
+		option.RegisterAddress = address
 	}
 }
 

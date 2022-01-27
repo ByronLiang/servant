@@ -20,17 +20,11 @@ type leaderFollowerWatcher struct {
 	first     bool
 }
 
-func (l leaderFollowerWatcher) Next() ([]*registry.ServiceInstance, error) {
+func (l *leaderFollowerWatcher) Next() ([]*registry.ServiceInstance, error) {
 	if l.first {
-		item, err := l.getInstance()
-		if err != nil {
-			return nil, err
-		}
-		l.first = false
 		l.watchChan = l.election.Observe(l.ctx)
-		return item, nil
+		l.first = false
 	}
-
 	select {
 	case <-l.ctx.Done():
 		return nil, l.ctx.Err()
@@ -55,7 +49,7 @@ func (l *leaderFollowerWatcher) getInstance() ([]*registry.ServiceInstance, erro
 	return items, nil
 }
 
-func (l leaderFollowerWatcher) Stop() error {
+func (l *leaderFollowerWatcher) Stop() error {
 	l.cancel()
 	return l.session.Close()
 }
@@ -66,6 +60,7 @@ func newLeaderFollowerWatcher(cctx context.Context, key string, session *concurr
 		ctx:    ctx,
 		cancel: cancel,
 		key:    key,
+		first:  true,
 	}
 	prefix := w.key + "/"
 	resp, err := session.Client().Get(ctx, prefix, clientv3.WithFirstCreate()...)
