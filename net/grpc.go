@@ -32,10 +32,9 @@ type gRpcServer struct {
 
 func NewGRpc(opts ...GRpcOption) *gRpcServer {
 	options := gRpcServerOption{
-		Kind:         GRPCKind,
-		Network:      "tcp",
-		Keepalive:    time.Duration(10) * time.Second,
-		IsRegistered: true,
+		Kind:      GRPCKind,
+		Network:   "tcp",
+		Keepalive: 10 * time.Second,
 	}
 	for _, opt := range opts {
 		opt(&options)
