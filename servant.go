@@ -69,15 +69,12 @@ func (s *Servant) Run() []error {
 			return srvErrList
 		}
 		s.opt.registrarInstance = instance
+		// registrar type is leader-follower
 		if leaderFollowerRegister, ok := s.opt.registrar.(*etcd.LeaderFollowerRegistry); ok {
 			select {
 			case campaignRes := <-leaderFollowerRegister.CampaignRes:
 				if campaignRes != nil {
 					srvErrList = append(srvErrList, campaignRes)
-					err = s.opt.registrar.Deregister(context.Background(), instance)
-					if err != nil {
-						srvErrList = append(srvErrList, err)
-					}
 					err := s.Stop()
 					if err != nil {
 						srvErrList = append(srvErrList, err)
@@ -85,6 +82,9 @@ func (s *Servant) Run() []error {
 					return srvErrList
 				}
 				// campaign leader success handle
+				if s.opt.campaignLeaderSuccessFunc != nil {
+					s.opt.campaignLeaderSuccessFunc()
+				}
 			case <-c:
 				err := s.Stop()
 				if err != nil {
@@ -98,9 +98,6 @@ func (s *Servant) Run() []error {
 	case <-ctx.Done():
 		// 服务启动异常, 无需调用Stop方法, 有可能引发空指针
 	case <-c:
-		if s.opt.registrarInstance != nil && s.opt.registrar != nil {
-			s.opt.registrar.Deregister(context.Background(), s.opt.registrarInstance)
-		}
 		err := s.Stop()
 		if err != nil {
 			srvErrList = append(srvErrList, err)
@@ -111,22 +108,37 @@ func (s *Servant) Run() []error {
 }
 
 func (s *Servant) Stop() error {
+	var err error
+	if s.opt.registrarInstance != nil && s.opt.registrar != nil {
+		err = s.opt.registrar.Deregister(context.Background(), s.opt.registrarInstance)
+	}
 	for _, srv := range s.opt.servers {
 		srv.Stop()
 	}
-	return nil
+	return err
 }
 
 func (s *Servant) buildServiceInstance() *registry.ServiceInstance {
 	for _, srv := range s.opt.servers {
 		if srv.IsRegistered() && s.opt.registrar != nil {
 			if r, ok := srv.(net.EndPoint); ok {
+				var id, version string
+				if s.opt.id == "" {
+					id = s.opt.name
+				} else {
+					id = s.opt.id
+				}
+				if s.opt.version == "" {
+					version = s.opt.version
+				} else {
+					version = s.opt.version
+				}
 				endpoint, err := r.Endpoint()
 				if err == nil {
 					return &registry.ServiceInstance{
-						ID:        s.opt.name,
+						ID:        id,
 						Name:      s.opt.name,
-						Version:   "v1.0.0",
+						Version:   version,
 						Metadata:  nil,
 						Endpoints: []string{endpoint.String()},
 					}
