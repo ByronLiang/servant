@@ -3,7 +3,7 @@ package grpc_handler
 import (
 	"context"
 
-	"github.com/ByronLiang/servant/examples/web/pb"
+	"github.com/ByronLiang/servant/examples/public/pb"
 	"google.golang.org/grpc"
 )
 

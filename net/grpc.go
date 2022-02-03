@@ -32,10 +32,9 @@ type gRpcServer struct {
 
 func NewGRpc(opts ...GRpcOption) *gRpcServer {
 	options := gRpcServerOption{
-		Kind:         GRPCKind,
-		Network:      "tcp",
-		Keepalive:    time.Duration(10) * time.Second,
-		IsRegistered: true,
+		Kind:      GRPCKind,
+		Network:   "tcp",
+		Keepalive: 10 * time.Second,
 	}
 	for _, opt := range opts {
 		opt(&options)
@@ -72,7 +71,13 @@ func (gRPC *gRpcServer) Endpoint() (*url.URL, error) {
 			err = errListen
 			return
 		}
-		addr, errHostExtract := util.Extract(gRPC.options.Address, lis)
+		var endpointAddr string
+		if gRPC.options.RegisterAddress != "" {
+			endpointAddr = gRPC.options.RegisterAddress
+		} else {
+			endpointAddr = gRPC.options.Address
+		}
+		addr, errHostExtract := util.Extract(endpointAddr, lis)
 		if errHostExtract != nil {
 			_ = lis.Close()
 			err = errHostExtract

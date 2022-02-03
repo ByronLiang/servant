@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option go_package="github.com/ByronLiang/servant/examples/public/pb";
+package pb;
+
+service Leaf {
+    rpc Query (LeafRequest) returns (LeafResponse) {}
+}
+
+message LeafRequest {
+    int64 domain = 1;
+}
+
+message LeafResponse {
+    int64 number = 1;
+}

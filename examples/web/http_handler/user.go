@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ByronLiang/servant/examples/web/pb"
+	"github.com/ByronLiang/servant/examples/public/pb"
 	"github.com/ByronLiang/servant/examples/web/rpc"
 	"github.com/gin-gonic/gin"
 )
